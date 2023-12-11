@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+
+<html lang="it">
+
+{% load static %}
+
+<head>
+
+    <!-- Title -->
+    <title>FANTASHOOT</title>
+
+    <!-- Icon -->
+    <link rel="shortcut icon" href="{% static 'img/logo.png' %}" type="image/x-icon">
+
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css" href="{% static 'index.css' %}">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
+
+    <!-- JS -->
+    <script src="https://unpkg.com/htmx.org@latest"></script>
+
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header">
+
+            <!-- Disclaimer -->
+            <div class="disclaimer">
+                <p>Creato solo a scopo di intrattenimento, senza alcun scopo di lucro.</p>
+            </div>
+
+            <!-- Logo and User -->
+            <div class="logo-user-container">
+
+                <!-- Logo -->
+                <div class="logo">
+                    <img src="{% static 'img/logo.png' %}" alt="logo">
+                    <label>Fantashoot</label>
+                </div>
+
+                <!-- user not authenticated -->
+                {% if not user.is_authenticated %}
+
+                    <!-- login form -->
+                    <div class="login-container">
+                        <form method="post" action="{% url 'index' %}">
+                            {% csrf_token %}
+                            <input type="text" name="username" placeholder="Username" required>
+                            <input type="password" name="password" placeholder="Password" required>
+                            <input type="submit" value="Accedi">
+                        </form>
+                    </div>
+
+                <!-- user authenticated -->
+                {% else %}
+                    <div class="user-container">
+                        <!-- if the user is in group giocatore display his bilancio -->
+                        {% if user.groups.all.0.name == 'Giocatore' %}
+                        <h1>{{bilancio}} ⚽ </h1>
+                        
+                        {% endif %}
+                        <!-- username and logout button -->
+                        <h1>{{ user.username }}</h1>
+                        <form method="post" action="{% url 'logout' %}">
+                            {% csrf_token %}
+                            <input type="submit" value="Logout">
+                        </form>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <content>
+
+        <!-- Error Message -->
+        {% if error_message %}
+            <div class="error">⚠ {{ error_message }}</div>
+        {% endif %}
+        
+        <!-- Success Message -->
+        {% if success_message %}
+            <div class="success">✔ {{ success_message }}</div>
+        {% endif %}
+
+        <!-- if user is not logged in -->
+        {% if not user.is_authenticated %}
+
+            <!-- Welcome -->
+            <div class="welcome">
+                <h1>Benvenuto in <em>Fantashoot</em></h1>
+                <h4>Il gioco di fantacalcio <span style="font-style: italic; background-color: #87a7f1; color: #141d2b;">settimanale </span> unico al mondo!</h4>
+            </div>
+
+            <!-- Tornei attuali -->
+            <div class="action-container">
+                <h1> Tornei Disponibili</h1>
+                {% if tornei %}
+                    <div class="tornei">
+                        <!-- per ogni torneo una card-->
+                        {% for torneo in tornei %}
+                            <div class="card">
+                                <div class="card-header">
+                                    <p>montepremi</p>
+                                    <h1 id="montepremi {{ torneo }}">{{ torneo.montepremi | floatformat:2 }}</h1>
+                                    <hr>
+                                </div>
+                                <div class="card-content">
+                                    <p>{{ torneo.dataInizio }} - {{ torneo.dataFine }}</p>
+                                    <hr>
+                                    <p id="primo {{ torneo }}"></p>
+                                    <p id="secondo {{ torneo }}"></p>
+                                    <p id="terzo {{ torneo }}"></p>
+                                </div>
+                                <!-- for each torneo calculate primo, secondo e terzo -->
+                                <script>
+                                    var montepremi = document.getElementById("montepremi {{ torneo }}").innerHTML;
+                                    var primo = document.getElementById("primo {{ torneo }}");
+                                    var secondo = document.getElementById("secondo {{ torneo }}");
+                                    var terzo = document.getElementById("terzo {{ torneo }}");
+                                    primo.innerHTML = "1°: " + (montepremi * 0.5).toFixed(2) + " ⚽";
+                                    secondo.innerHTML = "2°: " + (montepremi * 0.25).toFixed(2) + " ⚽";
+                                    terzo.innerHTML = "3°: " + (montepremi * 0.15).toFixed(2) + " ⚽";
+                                </script>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <h1>Nessun Torneo Disponibile</h1>
+                {% endif %}  
+            </div>
+
+        {% endif %}
+
+        <!-- if user is in group Agenzia -->
+        {% if user.groups.all.0.name == 'Agenzia' %}
+
+            <!-- Aggiungi utente -->
+            <div class="action-container">
+                <h1> Aggiungi Utente </h1>
+                <form method="post" action="{% url 'add_player' %}">
+                    {% csrf_token %}
+                    <input type="text" name="username" placeholder="Username" required>
+                    <input type="password" name="password" placeholder="Password" required>
+                    <input type="submit" value="Aggiungi">
+                </form>
+            </div>
+
+            <!-- Modifica utente -->
+            <div class="action-container">
+                <h1> Modifica Utente </h1>
+                <!-- drop down menu to select the user -->
+                {% if giocatori %}
+                    <form method="post" action="{% url 'modify_player' %}">
+                        {% csrf_token %}
+                        <select name="giocatore" required>
+                            {% for giocatore in giocatori %}
+                            <option value="{{ giocatore.username }}">{{ giocatore.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="password" name="password" placeholder="Nuova Password">
+                        <input type="number" name="addbilancio" placeholder="Ricarica bilancio">
+                        <input type="number" name="removebilancio" placeholder="Rimuovi bilancio">
+                        <input type="submit" value="Modifica">
+                    </form>
+                {% endif %}
+            </div>
+
+            <!-- Tabella transazioni -->
+            <div class="table-container">
+                <h1> Transazioni </h1>
+                {% if transazioni %}
+                    <!-- display pandas dataframe -->
+                    {{ transazioni|safe }}
+                {% endif %}
+            </div> 
+
+        {% endif %}
+
+        <!-- if user is in group Giocatore -->
+        {% if user.groups.all.0.name == 'Giocatore' %}
+
+            <!-- Tornei attuali -->
+            <button class="title"> Tornei Disponibili </button>
+            <div class="action-container">
+                {% if tornei %}
+                    <p>Il montepremi aumenta con le iscrizioni, non c'è limite!</p>
+                    <div class="tornei">
+                        <!-- per ogni torneo una card-->
+                        {% for torneo in tornei %}
+                        <div class="card">
+                            <div class="card-header">
+                                <h1>{{ torneo.quota | floatformat:2 }} ⚽</h1>
+                                <hr>
+                            </div>
+                            <div class="card-content">
+                                <p>{{ torneo.dataInizio }} - {{ torneo.dataFine }}</p>
+                                <hr>
+                                <p>montepremi</p>
+                                <h1 id="montepremi {{ torneo }}">{{ torneo.montepremi | floatformat:2 }}</h1>
+                                <p id="primo {{ torneo }}"></p>
+                                <p id="secondo {{ torneo }}"></p>
+                                <p id="terzo {{ torneo }}"></p>
+                            </div>
+                            <!-- for each torneo calculate primo, secondo e terzo -->
+                            <script>
+                                var montepremi = document.getElementById("montepremi {{ torneo }}").innerHTML;
+                                var primo = document.getElementById("primo {{ torneo }}");
+                                var secondo = document.getElementById("secondo {{ torneo }}");
+                                var terzo = document.getElementById("terzo {{ torneo }}");
+                                primo.innerHTML = "1°: " + (montepremi * 0.5).toFixed(2) + " ⚽";
+                                secondo.innerHTML = "2°: " + (montepremi * 0.25).toFixed(2) + " ⚽";
+                                terzo.innerHTML = "3°: " + (montepremi * 0.15).toFixed(2) + " ⚽";
+                            </script>
+                            <!-- Form iscrizione torneo, con seleziona squadra e tasto iscriviti -->
+                            <form method="post" action="{% url 'subscribe_tournament' %}">
+                                {% csrf_token %}
+                                <select name="squadra" required selected="Seleziona Squadra">
+                                    {% if squadre %}
+                                    <option value="" selected disabled hidden>Seleziona Squadra</option>
+                                    {% else %}
+                                    <option value="" selected disabled hidden>Nessuna Squadra Disponibile</option>
+                                    {% endif %}
+                                    {% for squadra in squadre %}
+                                    <option value="{{ squadra.nome }}">{{ squadra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="hidden" name="torneo" value="{{ torneo.ID }}">
+                                <input type="submit" value="Iscriviti">
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <h1>Nessun Torneo Disponibile</h1>
+                {% endif %}
+            </div>
+
+            <!-- Calendario partite settimana -->
+            <button class="title"> Partite della settimana </button>
+            <div class="action-container">
+                <div class="tornei">
+                {% if settimana %}
+                    {% for partita in settimana %}
+                    <div class="card" style="max-width: 200px; margin: 10px;">
+                        <div class="card-content">
+                            <p style="font-size: 12px; margin: 5px;">{{ partita }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+                </div>
+            </div>
+
+             <!-- Sezione crea squadra -->
+             <button class="title"> Crea Squadra </button>
+             <div class="action-container">
+                 <form method="post" autocomplete="on" action="{% url 'create_team' %}">
+                     {% csrf_token %}
+                         <input style="position:relative; z-index: 9; text-align: center;" type="text" name="nome" placeholder="Nome Squadra" required>
+                         <!-- selezione modulo default 3-4-3 -->
+                         <div class="modulo-container" style="position:relative; z-index: 9;">
+                             <select name="modulo" style="text-align: center;" required>
+                                 <option value="" selected disabled hidden>Seleziona modulo</option>
+                                 <option value="3-4-3">3-4-3</option>
+                                 <option value="3-5-2">3-5-2</option>
+                                 <option value="4-3-3">4-3-3</option>
+                                 <option value="4-4-2">4-4-2</option>
+                                 <option value="4-5-1">4-5-1</option>
+                                 <option value="5-3-2">5-3-2</option>
+                                 <option value="5-4-1">5-4-1</option>
+                             </select>
+                         </div>
+                         <div class="stage texture">
+                             <!-- campo da calcio -->
+                             <div  class="world">
+                                 <div class="terrain js-terrain">
+                                     <div class="field field--alt"></div>
+                                     <div class="field ground">
+                                         <div class="field__texture field__texture--gradient"></div>
+                                         <div class="field__texture field__texture--gradient-b"></div>
+                                         <div class="field__texture field__texture--grass"></div>
+                                         <div class="field__line field__line--goal"></div>
+                                         <div class="field__line field__line--goal field__line--goal--far"></div>
+                                         <div class="field__line field__line--outline"></div>
+                                         <div class="field__line field__line--penalty"></div>
+                                         <div class="field__line field__line--penalty-arc"></div>
+                                         <div class="field__line field__line--penalty-arc field__line--penalty-arc--far"></div>
+                                         <div class="field__line field__line--mid"></div>
+                                         <div class="field__line field__line--circle"></div>
+                                         <div class="field__line field__line--penalty field__line--penalty--far"></div>
+                                     </div>
+                                     <div class="field__side field__side--front"></div>
+                                     <div class="field__side field__side--left"></div>
+                                     <div class="field__side field__side--right"></div>
+                                     <div class="field__side field__side--back"></div>
+                                 </div>
+                             </div>
+                             <div class="giocatori-container">
+                                 <!-- selezione portieri con ricerca -->
+                                 <div class="portieri-container">
+                                     <input type="text" name="portiere" placeholder="Portiere" required list="portieri" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <datalist id="portieri">
+                                         {% for portiere in portieri %}
+                                             <option value="{{ portiere }}">{{ portiere }}</option>
+                                         {% endfor %}
+                                     </datalist>
+                                 </div>
+                                 <!-- selezione difensori con ricerca -->
+                                 <div class="difensori-container">
+                                     <input type="text" name="difensore1" placeholder="Difensore" required list="difensori" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="difensore2" placeholder="Difensore" required list="difensori" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="difensore3" placeholder="Difensore" required list="difensori" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="difensore4" placeholder="Difensore" required list="difensori" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="difensore5" placeholder="Difensore" required list="difensori" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <datalist id="difensori">
+                                         {% for difensore in difensori %}
+                                             <option value="{{ difensore }}">{{ difensore }}</option>
+                                         {% endfor %}
+                                     </datalist>
+                                 </div>
+                                 <!-- selezione centrocampisti con ricerca -->
+                                 <div class="centrocampisti-container">
+                                     <input type="text" name="centrocampista1" placeholder="Centrocampista" required list="centrocampisti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="centrocampista2" placeholder="Centrocampista" required list="centrocampisti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="centrocampista3" placeholder="Centrocampista" required list="centrocampisti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="centrocampista4" placeholder="Centrocampista" required list="centrocampisti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="centrocampista5" placeholder="Centrocampista" required list="centrocampisti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <datalist id="centrocampisti">
+                                         {% for centrocampista in centrocampisti %}
+                                         <option value="{{ centrocampista }}">{{ centrocampista }}></option>
+                                         {% endfor %}
+                                     </datalist>
+                                 </div>
+                                 <!-- selezione attaccanti con ricerca -->
+                                 <div class="attaccanti-container">
+                                     <input type="text" name="attaccante1" placeholder="Attaccante" required list="attaccanti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="attaccante2" placeholder="Attaccante" required list="attaccanti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <input type="text" name="attaccante3" placeholder="Attaccante" required list="attaccanti" onclick="this.value=''" onchange="clearDuplicate(this)">
+                                     <datalist id="attaccanti">
+                                         {% for attaccante in attaccanti %}
+                                             <option value="{{ attaccante }}">{{ attaccante }}</option>
+                                         {% endfor %}
+                                     </datalist>
+                                 </div>
+ 
+                                 <!-- script to check duplicates -->
+                                 <script>
+                                     const inputElements = document.querySelectorAll('.portieri-container input[type="text"], .difensori-container input[type="text"], .centrocampisti-container input[type="text"], .attaccanti-container input[type="text"]');
+                                     const clearDuplicate = (input) => {
+                                         inputElements.forEach((inputElement) => {
+                                             if (inputElement.value === input.value && inputElement !== input) {
+                                                 inputElement.value = '';
+                                             }
+                                         });
+                                     };
+                                 </script>
+                                 <!-- script to change formation, hide players based on formation -->
+                                 <script>
+                                     var modulo = document.getElementsByName("modulo");
+                                     var difensori = document.getElementsByClassName("difensori-container");
+                                     var centrocampisti = document.getElementsByClassName("centrocampisti-container");
+                                     var attaccanti = document.getElementsByClassName("attaccanti-container");
+                                     var portieri = document.getElementsByClassName("portieri-container");
+                                     // add event listener to the modulo select
+                                     modulo[0].addEventListener("change", function() {
+                                         // if the selected value is 3-4-3
+                                         if (modulo[0].value == "3-4-3") {
+                                             // show 3 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "none";
+                                             difensori[0].children[3].required = false;
+                                             difensori[0].children[3].value = "";
+                                             difensori[0].children[4].style.display = "none";
+                                             difensori[0].children[4].required = false;
+                                             difensori[0].children[4].value = "";
+                                             // show 4 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "flex";
+                                             centrocampisti[0].children[4].style.display = "none";
+                                             centrocampisti[0].children[4].required = false;
+                                             centrocampisti[0].children[4].value = "";
+                                             // show 3 attaccanti
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "flex";
+                                             attaccanti[0].children[2].style.display = "flex";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                             
+                                         }
+                                         // if the selected value is 3-5-2
+                                         if (modulo[0].value == "3-5-2") {
+                                             // show 3 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "none";
+                                             difensori[0].children[3].required = false;
+                                             difensori[0].children[3].value = "";
+                                             difensori[0].children[4].style.display = "none";
+                                             difensori[0].children[4].required = false;
+                                             difensori[0].children[4].value = "";
+                                             // show 5 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "flex";
+                                             centrocampisti[0].children[4].style.display = "flex";
+                                             // show 2 attaccanti
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "flex";
+                                             attaccanti[0].children[2].style.display = "none";
+                                             attaccanti[0].children[2].required = false;
+                                             attaccanti[0].children[2].value = "";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                         // if the selected value is 4-3-3
+                                         if (modulo[0].value == "4-3-3") {
+                                             // show 4 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "flex";
+                                             difensori[0].children[4].style.display = "none";
+                                             difensori[0].children[4].required = false;
+                                             difensori[0].children[4].value = "";
+                                             // show 3 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "none";
+                                             centrocampisti[0].children[3].required = false;
+                                             centrocampisti[0].children[3].value = "";
+                                             centrocampisti[0].children[4].style.display = "none";
+                                             centrocampisti[0].children[4].required = false;
+                                             centrocampisti[0].children[4].value = "";
+                                             // show 3 attaccanti
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "flex";
+                                             attaccanti[0].children[2].style.display = "flex";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                         // if the selected value is 4-4-2
+                                         if (modulo[0].value == "4-4-2") {
+                                             // show 4 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "flex";
+                                             difensori[0].children[4].style.display = "none";
+                                             difensori[0].children[4].required = false;
+                                             difensori[0].children[4].value = "";
+                                             // show 4 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "flex";
+                                             centrocampisti[0].children[4].style.display = "none";
+                                             centrocampisti[0].children[4].required = false;
+                                             centrocampisti[0].children[4].value = "";
+                                             // show 2 attaccanti
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "flex";
+                                             attaccanti[0].children[2].style.display = "none";
+                                             attaccanti[0].children[2].required = false;
+                                             attaccanti[0].children[2].value = "";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                         // if the selected value is 4-5-1
+                                         if (modulo[0].value == "4-5-1") {
+                                             // show 4 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "flex";
+                                             difensori[0].children[4].style.display = "none";
+                                             difensori[0].children[4].required = false;
+                                             difensori[0].children[4].value = "";
+                                             // show 5 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "flex";
+                                             centrocampisti[0].children[4].style.display = "flex";
+                                             // show 1 attaccante
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "none";
+                                             attaccanti[0].children[1].required = false;
+                                             attaccanti[0].children[1].value = "";
+                                             attaccanti[0].children[2].style.display = "none";
+                                             attaccanti[0].children[2].required = false;
+                                             attaccanti[0].children[2].value = "";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                         // if the selected value is 5-3-2
+                                         if (modulo[0].value == "5-3-2") {
+                                             // show 5 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "flex";
+                                             difensori[0].children[4].style.display = "flex";
+                                             // show 3 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "none";
+                                             centrocampisti[0].children[3].required = false;
+                                             centrocampisti[0].children[3].value = "";
+                                             centrocampisti[0].children[4].style.display = "none";
+                                             centrocampisti[0].children[4].required = false;
+                                             centrocampisti[0].children[4].value = "";
+                                             // show 2 attaccanti
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "flex";
+                                             attaccanti[0].children[2].style.display = "none";
+                                             attaccanti[0].children[2].required = false;
+                                             attaccanti[0].children[2].value = "";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                         // if the selected value is 5-4-1
+                                         if (modulo[0].value == "5-4-1") {
+                                             // show 5 difensori
+                                             difensori[0].children[0].style.display = "flex";
+                                             difensori[0].children[1].style.display = "flex";
+                                             difensori[0].children[2].style.display = "flex";
+                                             difensori[0].children[3].style.display = "flex";
+                                             difensori[0].children[4].style.display = "flex";
+                                             // show 4 centrocampisti
+                                             centrocampisti[0].children[0].style.display = "flex";
+                                             centrocampisti[0].children[1].style.display = "flex";
+                                             centrocampisti[0].children[2].style.display = "flex";
+                                             centrocampisti[0].children[3].style.display = "flex";
+                                             centrocampisti[0].children[4].style.display = "none";
+                                             centrocampisti[0].children[4].required = false;
+                                             centrocampisti[0].children[4].value = "";
+                                             // show 1 attaccante
+                                             attaccanti[0].children[0].style.display = "flex";
+                                             attaccanti[0].children[1].style.display = "none";
+                                             attaccanti[0].children[1].required = false;
+                                             attaccanti[0].children[1].value = "";
+                                             attaccanti[0].children[2].style.display = "none";
+                                             attaccanti[0].children[2].required = false;
+                                             attaccanti[0].children[2].value = "";
+                                             // show 1 portiere
+                                             portieri[0].children[0].style.display = "flex";
+                                         }
+                                     });
+                                 </script>
+                             </div>
+                         </div>
+                         <input type="submit" value="Crea squadra" style="width: 150px; margin-top: 550px; z-index:21; position: relative;">
+ 
+                 </form>
+             </div>
+
+            <!-- Iscrizioni attuali -->
+            <button class="title"> Iscrizioni Attuali </button>
+            <div class="action-container">
+                <p>Lista delle iscrizioni ai tornei disponibili</p>
+                {% if iscrizioni %}
+                    <div class="tornei" >
+                        <div class="filter-buttons">
+                            <!-- buttons to show the iscrizioni based on the quota -->
+                            <button class="quota" onclick="showQuota(0)">Tutte</button>
+                            <button class="quota" onclick="showQuota(1)">1.00 ⚽</button>
+                            <button class="quota" onclick="showQuota(2)">2.50 ⚽</button>
+                            <button class="quota" onclick="showQuota(3)">5.00 ⚽</button>
+                        </div>
+
+                        <!-- per ogni torneo una card-->
+                            {% for iscrizione in iscrizioni %}
+                            <div class="card i">
+                                <div class="card-header">
+                                    <h1 id="i {{iscrizione.quota}}" style="font-size: 32px;">{{ iscrizione.quota | floatformat:2  }} ⚽</h1>
+                                    <h1 style="font-size: 32px;">{{ iscrizione.squadra }}</h1>
+                                    <hr>
+                                </div>
+                                <div class="card-content">
+                                    <p>Modulo:</p>
+                                    <p>{{ iscrizione.ordine }}</p>
+                                    <hr>
+                                    <p style="font-size: 12px; background-color: #e0932e;">Portiere:</p>
+                                    <p id="portiere {{ iscrizione.ID }}" style="font-size: 12px;">{{ iscrizione.g1 }} </p>
+                                    <p style="font-size: 12px; background-color: #1d9130;">Difensori:</p>
+                                    <p id="difensori {{ iscrizione.ID }}" style="font-size: 12px;"></p>
+                                    <p style="font-size: 12px; background-color: #1e28b1;">Centrocampisti:</p>
+                                    <p id="centrocampisti {{ iscrizione.ID }}" style="font-size: 12px;"></p>
+                                    <p style="font-size: 12px; background-color: #e0342e;">Attaccanti:</p>
+                                    <p id="attaccanti {{ iscrizione.ID }}" style="font-size: 12px;"></p>
+                                </div>
+                                <script>
+                                    // get the players of the team
+                                    var portiere = document.getElementById("portiere {{ iscrizione.ID }}").innerHTML;
+                                    var difensori = document.getElementById("difensori {{ iscrizione.ID }}");
+                                    var centrocampisti = document.getElementById("centrocampisti {{ iscrizione.ID }}");
+                                    var attaccanti = document.getElementById("attaccanti {{ iscrizione.ID }}");
+                                    // based on the formation show the players
+                                    if ("{{ iscrizione.ordine }}" == "3-4-3") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g5 }}, {{ iscrizione.g6 }}, {{ iscrizione.g7 }}, {{ iscrizione.g8 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g9 }}, {{ iscrizione.g10 }}, {{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "3-5-2") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g5 }}, {{ iscrizione.g6 }}, {{ iscrizione.g7 }}, {{ iscrizione.g8 }}, {{ iscrizione.g9 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g10 }}, {{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "4-3-3") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}, {{ iscrizione.g5 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g6 }}, {{ iscrizione.g7 }}, {{ iscrizione.g8 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g9 }}, {{ iscrizione.g10 }}, {{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "4-4-2") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}, {{ iscrizione.g5 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g6 }}, {{ iscrizione.g7 }}, {{ iscrizione.g8 }}, {{ iscrizione.g9 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g10 }}, {{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "4-5-1") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}, {{ iscrizione.g5 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g6 }}, {{ iscrizione.g7 }}, {{ iscrizione.g8 }}, {{ iscrizione.g9 }}, {{ iscrizione.g10 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "5-3-2") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}, {{ iscrizione.g5 }}, {{ iscrizione.g6 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g7 }}, {{ iscrizione.g8 }}, {{ iscrizione.g9 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g10 }}, {{ iscrizione.g11 }}";
+                                    }
+                                    if ("{{ iscrizione.ordine }}" == "5-4-1") {
+                                        difensori.innerHTML = "{{ iscrizione.g2 }}, {{ iscrizione.g3 }}, {{ iscrizione.g4 }}, {{ iscrizione.g5 }}, {{ iscrizione.g6 }}";
+                                        centrocampisti.innerHTML = "{{ iscrizione.g7 }}, {{ iscrizione.g8 }}, {{ iscrizione.g9 }}, {{ iscrizione.g10 }}";
+                                        attaccanti.innerHTML = "{{ iscrizione.g11 }}";
+                                    }
+                                </script>
+                            </div>
+                            {% endfor %}
+                    </div>
+                    <!-- script to hide/show cards based on the selected button -->
+                    <script>
+                        function showQuota(quota) {
+                            var cards = document.getElementsByClassName("card i");
+                            if (quota == 0) {
+                                for (var i = 0; i < cards.length; i++) {
+                                    cards[i].style.display = "flex";
+                                }
+                            }
+                            if (quota == 1) {
+                                for (var i = 0; i < cards.length; i++) {
+                                    if (cards[i].children[0].children[0].id == "i 1.0") {
+                                        cards[i].style.display = "flex";
+                                    } else {
+                                        cards[i].style.display = "none";
+                                    }
+                                }
+                            }
+                            if (quota == 2) {
+                                for (var i = 0; i < cards.length; i++) {
+                                    if (cards[i].children[0].children[0].id == "i 2.5") {
+                                        cards[i].style.display = "flex";
+                                    } else {
+                                        cards[i].style.display = "none";
+                                    }
+                                }
+                            }
+                            if (quota == 3) {
+                                for (var i = 0; i < cards.length; i++) {
+                                    if (cards[i].children[0].children[0].id == "i 5.0") {
+                                        cards[i].style.display = "flex";
+                                    } else {
+                                        cards[i].style.display = "none";
+                                    }
+                                }
+                            }
+                        }           
+                    </script>
+                    
+                    {% else %}
+                    <h1>Non ci sono iscritti!</h1>
+                {% endif %}
+            </div>
+
+            <!-- Squadre attive -->
+            <button class="title"> Squadre Attive </button>
+            <div class="action-container">
+                <p> Lista delle squadre registrate negli ultimi 15 giorni</p>
+                {% if squadre %}
+                    <div class="tornei">
+                        <!-- per ogni torneo una card-->
+                        {% for squadra in squadre %}
+                            <div class="card">
+                                <div class="card-header">
+                                    <h1 style="font-size: 32px;">{{ squadra.nome }}</h1>
+                                    <hr>
+                                </div>
+                                <div class="card-content">
+                                    <p>Modulo:</p>
+                                    <p>{{ squadra.ordine }}</p>
+                                    <hr>
+                                    <p style="font-size: 12px; background-color: #e0932e;">Portiere:</p>
+                                    <p id="portiere {{ squadra }}" style="font-size: 12px;">{{ squadra.g1 }} </p>
+                                    <p style="font-size: 12px; background-color: #1d9130;">Difensori:</p>
+                                    <p id="difensori {{ squadra }}" style="font-size: 12px;"></p>
+                                    <p style="font-size: 12px; background-color: #1e28b1;">Centrocampisti:</p>
+                                    <p id="centrocampisti {{ squadra }}" style="font-size: 12px;"></p>
+                                    <p style="font-size: 12px; background-color: #e0342e;">Attaccanti:</p>
+                                    <p id="attaccanti {{ squadra }}" style="font-size: 12px;"></p>
+                                </div>
+                                <script>
+                                    // get the players of the team
+                                    var portiere = document.getElementById("portiere {{ squadra }}").innerHTML;
+                                    var difensori = document.getElementById("difensori {{ squadra }}");
+                                    var centrocampisti = document.getElementById("centrocampisti {{ squadra }}");
+                                    var attaccanti = document.getElementById("attaccanti {{ squadra }}");
+                                    // based on the formation show the players
+                                    if ("{{ squadra.ordine }}" == "3-4-3") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g5 }}, {{ squadra.g6 }}, {{ squadra.g7 }}, {{ squadra.g8 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g9 }}, {{ squadra.g10 }}, {{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "3-5-2") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g5 }}, {{ squadra.g6 }}, {{ squadra.g7 }}, {{ squadra.g8 }}, {{ squadra.g9 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g10 }}, {{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "4-3-3") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}, {{ squadra.g5 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g6 }}, {{ squadra.g7 }}, {{ squadra.g8 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g9 }}, {{ squadra.g10 }}, {{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "4-4-2") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}, {{ squadra.g5 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g6 }}, {{ squadra.g7 }}, {{ squadra.g8 }}, {{ squadra.g9 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g10 }}, {{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "4-5-1") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}, {{ squadra.g5 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g6 }}, {{ squadra.g7 }}, {{ squadra.g8 }}, {{ squadra.g9 }}, {{ squadra.g10 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "5-3-2") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}, {{ squadra.g5 }}, {{ squadra.g6 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g7 }}, {{ squadra.g8 }}, {{ squadra.g9 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g10 }}, {{ squadra.g11 }}";
+                                    }
+                                    if ("{{ squadra.ordine }}" == "5-4-1") {
+                                        difensori.innerHTML = "{{ squadra.g2 }}, {{ squadra.g3 }}, {{ squadra.g4 }}, {{ squadra.g5 }}, {{ squadra.g6 }}";
+                                        centrocampisti.innerHTML = "{{ squadra.g7 }}, {{ squadra.g8 }}, {{ squadra.g9 }}, {{ squadra.g10 }}";
+                                        attaccanti.innerHTML = "{{ squadra.g11 }}";
+                                    }
+                                </script>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <h1>Nessuna Squadra Registrata</h1>
+                {% endif %}
+                
+            </div>
+
+            <!-- tornei precedenti -->
+            <button class="title"> Tornei Precedenti </button>
+            <div class="action-container">
+                <p> Lista dei tornei terminati negli ultimi 15 giorni</p>
+                {% if tornei_precedenti %}
+                    <div class="tornei">
+                        <!-- per ogni torneo una card-->
+                        {% for torneop in tornei_precedenti %}
+                            <div class="card">
+                                <div class="card-header">
+                                    <h1>{{ torneop.quota }} ⚽</h1>
+                                    <hr>
+                                </div>
+                                <div class="card-content">
+                                    <p>{{ torneop.dataInizio }} - {{ torneop.dataFine }}</p>
+                                    <hr>
+                                    {% if torneop.p1 %}
+                                    <p>1°: {{ torneop.p1 }} punti | {{ torneop.p1n }} | {{ torneop.p1v }} ⚽ </p>
+                                    {% endif %}
+                                    {% if torneop.p2 %}
+                                    <p>2°: {{ torneop.p2 }} punti | {{ torneop.p2n }} | {{ torneop.p2v }} ⚽ </p>
+                                    {% endif %}
+                                    {% if torneop.p3 %}
+                                    <p>3°: {{ torneop.p3 }} punti | {{ torneop.p3n }} | {{ torneop.p3v }} ⚽ </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p> Non ci sono stati tornei negli ultimi 15 giorni </p>
+                {% endif %}
+            </div>
+
+            <!-- Tabella transazioni -->
+            <button class="title"> Transazioni </button>
+                <div class="table-container">
+                    {% if not transazioni.empty %}
+                        <!-- display pandas dataframe -->
+                        {{ transazioni|safe }}
+                    {% endif %}
+                </div>
+
+        {% endif %}
+
+
+        <!-- if user is Admin -->
+        {% if user.is_superuser %}
+        <div class="admin">
+
+            <!-- Admin panel -->
+            <div class="admin-panel-container">
+                <h1>Azioni Admin</h1>
+                <!-- link to admin page -->
+                <div class="action-container">
+                    <a href="{% url 'admin:index' %}">Admin Page</a>
+                </div>
+                <!-- form to upload file -->
+                <div class="action-container">
+                    <h1>Carica File</h1>
+                    <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="date" name="start" required>
+                        <input type="date" name="end" required>
+                        <input type="file" name="file" required>
+                        <input type="submit" value="Carica">
+                    </form>
+                </div>
+                <!-- form to download db given a start and end time -->
+                <div class="action-container">
+                    <h1>Scarica DB</h1>
+                    <form method="post" action="{% url 'download_db' %}">
+                        {% csrf_token %}
+                        <input type="datetime-local" name="start" required>
+                        <input type="datetime-local" name="end" required>
+                        <input type="submit" value="Scarica">
+                    </form>
+                </div>
+            </div>
+
+            <!-- Agenzia panel -->
+            <div class="agency-panel-container">
+                <h1>Azioni Agenzia</h1>
+                <!-- form to create new agenzia -->
+                <div class="action-container">
+                    <h1>Aggiungi</h1>
+                    <form method="post" action="{% url 'add_agency' %}">
+                        {% csrf_token %}
+                        <input type="text" name="username" placeholder="Username" required>
+                        <input type="password" name="password" placeholder="Password" required>
+                        <input type="submit" value="Aggiungi">
+                    </form>
+                </div>
+                <!-- form to absolute an agenzia -->
+                <div class="action-container">
+                    <h1>Blocca</h1>
+                    <!-- drop down menu to select the agenzia -->
+                    {% if agenzie %}
+                    <form method="post" action="{% url 'block_agency' %}">
+                        {% csrf_token %}
+                        <select name="agenzia" required>
+                            {% for agenzia in agenzie %}
+                            <option value="{{ agenzia.username }}">{{ agenzia.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="submit" value="Blocca">
+                    </form>
+                    {% endif %}
+                </div>
+
+                <!-- form to modify an agenzia -->
+                <div class="action-container">
+                    <h1>Modifica</h1>
+                    <!-- drop down menu to select the agenzia -->
+                    {% if agenzie %}
+                    <form method="post" action="{% url 'modify_agency' %}">
+                        {% csrf_token %}
+                        <select name="agenzia" required>
+                            {% for agenzia in agenzie %}
+                            <option value="{{ agenzia.username }}">{{ agenzia.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="password" name="password" placeholder="Nuova Password" required>
+                        <input type="submit" value="Modifica">
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+        {% endif %}
+
+        <!-- script to collapse the cards -->
+        <script>
+            var coll = document.getElementsByClassName("title");
+            var i;
+            for (i = 0; i < coll.length; i++) {
+                coll[i].addEventListener("click", function() {
+                    var title = this;
+                    var content = this.nextElementSibling;
+                    if (content.style.maxHeight){
+                        content.style.maxHeight = null;
+                        title.style.borderRadius = "20px";
+                        content.style.width = "calc(95% - 40px)"; 
+                        content.style.opacity = "0.5";
+                        content.style.padding = "30px 0px 30px 0px";
+                        content.style.cursor = "default";
+                        content.style.pointerEvents = "none";
+                    } else {
+                        content.style.maxHeight = content.scrollHeight + content.offsetHeight + content.clientHeight + 1000 + "px";
+                        title.style.borderRadius = "20px 20px 0px 0px";
+                        content.style.padding = "15px 0px 15px 0px";
+                        content.style.width = "95%";
+                        content.style.opacity = "1";
+                        content.style.pointerEvents = "auto";
+                    }
+                });
+            }
+        </script>
+
+    </content>
+
+
+</body>
+
+</html>
